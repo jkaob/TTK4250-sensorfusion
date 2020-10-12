@@ -185,13 +185,12 @@ class EKF:
     def NEES(cls,   #CHECK THIS
              ekfstate: GaussParams,
              x_true: np.ndarray,
-             *,
              ) -> float:
         """Calculate the normalized etimation error squared from ekfstate to x_true."""
 
         x, P    = ekfstate
         x_diff  = x - x_true  # Optional step
-        NEES    = x_diff.T @ np.linalg.solve(P,x_diff)# @ x_diff
+        NEES    = x_diff.T @ la.inv(P) @ x_diff #np.linalg.solve(P,x_diff)# @ x_diff
         return NEES
 
     @classmethod
@@ -245,4 +244,4 @@ class EKF:
     ) -> bool:
         """ Check if z is inside sqrt(gate_sized_squared)-sigma ellipse of ekfstate in sensor_state """
         NIS = self.NIS(z, ekfstate, sensor_state=sensor_state)        
-        return NIS <= gate_size_square #  # TODO: a simple comparison should suffice here
+        return NIS <= gate_size_square # a simple comparison should suffice here

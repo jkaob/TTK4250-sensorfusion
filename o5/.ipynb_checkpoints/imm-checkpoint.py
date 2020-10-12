@@ -285,11 +285,11 @@ class IMM(Generic[MT]):
         sensor_state: Dict[str, Any] = None,
     ) -> bool:
         """Check if z is within the gate of any mode in immstate in sensor_state"""
-        #raise NotImplementedError  # TODO: remove when implemented
 
         #  find which of the modes gates the measurement z
-        mode_gated: List[bool] = [self.filters[0].gate(z, state, gate_size_squared,  sensor_state) for c in immstate.components]
-        gated: bool = not np.any(mode_gated, False) #  check if _any_ of the modes gated the measurement            
+        mode_gated: List[bool] = [self.filters[0].gate(z, mode, gate_size_square, sensor_state=sensor_state) for mode in immstate.components]
+            
+        gated: bool = np.any(mode_gated) #  check if _any_ of the modes gated the measurement            
         return gated
 
     def NISes(

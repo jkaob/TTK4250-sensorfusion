@@ -185,13 +185,12 @@ class EKF:
     def NEES(cls,   #CHECK THIS
              ekfstate: GaussParams,
              x_true: np.ndarray,
-             *,
              ) -> float:
         """Calculate the normalized etimation error squared from ekfstate to x_true."""
 
         x, P    = ekfstate
         x_diff  = x - x_true  # Optional step
-        NEES    = x_diff.T @ np.linalg.solve(P,x_diff)# @ x_diff
+        NEES    = x_diff.T @ la.inv(P) @ x_diff #np.linalg.solve(P,x_diff)# @ x_diff
         return NEES
 
     @classmethod

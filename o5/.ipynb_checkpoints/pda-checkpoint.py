@@ -8,9 +8,7 @@ from estimatorduck import StateEstimator
 from mixturedata import MixtureParameters
 from gaussparams import GaussParams
 
-import imm
-
-#This is ?? mixtrue parameter
+#This is mixture parameters or gauss parameters
 ET = TypeVar("ET")
 
 @dataclass
@@ -22,9 +20,7 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
 
     def predict(self, filter_state: ET, Ts: float) -> ET:
         """Predict state estimate Ts time units ahead"""
-        
-        predicted_state = self.state_filter.predict(filter_state, Ts)
-        return predicted_state
+        return self.state_filter.predict(filter_state, Ts)
     
 
     def gate(
@@ -38,8 +34,9 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
         M = Z.shape[0]
         g_squared = self.gate_size**2
 
-        # TODO: some for loop over elements of Z using self.state_filter.gate
-        gated = np.array([self.state_filter.gate(z, filter_state, g_squared, sensor_state,) for z in Z], dtype=bool)
+        # for loop over elements of Z using self.state_filter.gate
+        gated = np.array([self.state_filter.gate(z, filter_state, g_squared, sensor_state=sensor_state) for z in Z], dtype=bool)
+        gated = gated.reshape(M)
         return gated
 
     def loglikelihood_ratios(
@@ -51,7 +48,7 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
         """ Calculates the posterior event loglikelihood ratios."""
 
         log_PD = np.log(self.PD)
-        log_PND = np.log(1 - self.PD)  # P_ND = 1 - P_D
+        log_PND = np.log(1 - self.PD) 
         log_clutter = np.log(self.clutter_intensity)
 
         # allocate
@@ -59,7 +56,7 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
 
         # calculate log likelihood ratios
         ll[0]  =  log_clutter + log_PND # missed detection 
-        ll[1:] = [log_PD + self.state_filter.loglikelihood(z, filter_state, sensor_state=sensor_state) for z in Z]
+        ll[1:] = np.array([log_PD + self.state_filter.loglikelihood(z, filter_state, sensor_state=sensor_state) for z in Z])
 
         return ll
 
@@ -68,12 +65,12 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
         Z: np.ndarray, #(M, m)=(#measurements, dim)
         filter_state: ET,
         sensor_state: Optional[Dict[str, Any]] = None,
-    ) -> np.ndarray:  # beta, shape=(M + 1,): the association probabilities (normalized likelihood ratios)
+    ) -> np.ndarray:    # beta, shape=(M + 1,): the association probabilities
+                        #(normalized likelihood ratios)
         """calculate the poseterior event/association probabilities."""
 
         lls = self.loglikelihood_ratios(Z, filter_state, sensor_state=sensor_state)
         beta = np.exp(lls - scipy.special.logsumexp(lls))
-        #normalized likelihood ratios
         return beta
 
     def conditional_update(
@@ -109,10 +106,10 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
         Zg = Z[gated]
 
         # find association probabilities
-        beta = self.association_probabilities(Z, filter_state, sensor_state)
+        beta = self.association_probabilities(Zg, filter_state, sensor_state)
 
         # find the mixture components
-        filter_state_updated_mixture_components = self.conditional_update(Z, filter_state, sensor_state=sensor_state)
+        filter_state_updated_mixture_components = self.conditional_update(Zg, filter_state, sensor_state=sensor_state)
 
         # make mixture
         filter_state_update_mixture = MixtureParameters(beta, filter_state_updated_mixture_components)
@@ -132,7 +129,7 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
         """Perform a predict update cycle with Ts time units and measurements Z in sensor_state"""
 
         filter_state_predicted = self.predict(filter_state, Ts)
-        filter_state_updated   = self.update(Z, filter_state_predicted, sensor_state)
+        filter_state_updated   = self.update(Z, filter_state_predicted, sensor_state=sensor_state)
         return filter_state_updated
 
     def estimate(self, filter_state: ET) -> GaussParams:

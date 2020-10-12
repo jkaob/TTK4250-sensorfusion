@@ -29,6 +29,19 @@ import mixturereduction
 # %% The EKF
 
 
+def isPSD(arr: np.ndarray, do_print: bool = False) -> bool:
+    # This block only works for positive definite matrices (no zero eigvals)
+    # try:
+    #     arr_chol = np.linalg.cholesky(arr)
+    # except LinAlgError as e:
+    #     if do_print:
+    #         print(e)
+    #     return False
+    # return True
+
+    return np.allclose(arr, arr.T) and np.all(np.linalg.eigvals(arr) >= 0)
+
+
 @dataclass
 class EKF:
     # A Protocol so duck typing can be used
@@ -50,6 +63,8 @@ class EKF:
         """Predict the EKF state Ts seconds ahead."""
         x, P = ekfstate
 
+        assert isPSD(P), "P input to EKF.predict not PSD"
+
         F = self.dynamic_model.F(x, Ts)
         Q = self.dynamic_model.Q(x, Ts)
 
@@ -59,8 +74,9 @@ class EKF:
         assert np.all(np.isfinite(P_pred)) and np.all(
             np.isfinite(x_pred)
         ), "Non-finite EKF prediction."
-        state_pred = GaussParams(x_pred, P_pred)
+        assert isPSD(P_pred), "P_pred calculated by EKF.predict not PSD"
 
+        state_pred = GaussParams(x_pred, P_pred)
         return state_pred
 
     def innovation_mean(
@@ -68,7 +84,7 @@ class EKF:
         z: np.ndarray,
         ekfstate: GaussParams,
         *,
-        sensor_state: Dict[str, Any] = None,
+        sensor_state: Optional[Dict[str, Any]] = None,
     ) -> np.ndarray:
         """Calculate the innovation mean for ekfstate at z in sensor_state."""
 
@@ -85,16 +101,18 @@ class EKF:
         z: np.ndarray,
         ekfstate: GaussParams,
         *,
-        sensor_state: Dict[str, Any] = None,
+        sensor_state: Optional[Dict[str, Any]] = None,
     ) -> np.ndarray:
         """Calculate the innovation covariance for ekfstate at z in sensorstate."""
 
         x, P = ekfstate
+        assert isPSD(P), "P input to EKF.innovation_cov not PSD"
 
         H = self.sensor_model.H(x, sensor_state=sensor_state)
         R = self.sensor_model.R(x, sensor_state=sensor_state, z=z)
         S = H @ P @ H.T + R
 
+        assert isPSD(P), "S calculated by EKF.innovation_cov not PSD"
         return S
 
     def innovation(
@@ -102,7 +120,7 @@ class EKF:
         z: np.ndarray,
         ekfstate: GaussParams,
         *,
-        sensor_state: Dict[str, Any] = None,
+        sensor_state: Optional[Dict[str, Any]] = None,
     ) -> GaussParams:
         """Calculate the innovation for ekfstate at z in sensor_state."""
 
@@ -114,11 +132,16 @@ class EKF:
         return innovationstate
 
     def update(
-        self, z: np.ndarray, ekfstate: GaussParams, sensor_state: Dict[str, Any] = None
+        self,
+        z: np.ndarray,
+        ekfstate: GaussParams,
+        *,
+        sensor_state: Optional[Dict[str, Any]] = None,
     ) -> GaussParams:
         """Update ekfstate with z in sensor_state"""
 
         x, P = ekfstate
+        assert isPSD(P), "P input to EKF.update not PSD"
 
         v, S = self.innovation(z, ekfstate, sensor_state=sensor_state)
 
@@ -126,10 +149,18 @@ class EKF:
         W = P @ la.solve(S, H).T
 
         x_upd = x + W @ v
-        P_upd = P - W @ H @ P
+        I = np.eye(*P.shape)
+
+        # standard form seem to give numerical instability causing non-PSD matrices for certain setups,
+        # or that some other calculate increases it in IMM etc.
+        # P_upd = P - W @ H @ P
+
+        # Better to use the more numerically stable Joseph form
+        P_upd = (I - W @ H) @ P @ (I - W @ H).T + W @ self.sensor_model.R(x) @ W.T
 
         ekfstate_upd = GaussParams(x_upd, P_upd)
 
+        assert isPSD(P), "P_upd calculated by EKF.update not PSD"
         return ekfstate_upd
 
     def step(
@@ -139,7 +170,7 @@ class EKF:
         # sampling time
         Ts: float,
         *,
-        sensor_state: Dict[str, Any] = None,
+        sensor_state: Optional[Dict[str, Any]] = None,
     ) -> GaussParams:
         """Predict ekfstate Ts units ahead and then update this prediction with z in sensor_state."""
 
@@ -152,7 +183,7 @@ class EKF:
         z: np.ndarray,
         ekfstate: GaussParams,
         *,
-        sensor_state: Dict[str, Any] = None,
+        sensor_state: Optional[Dict[str, Any]] = None,
     ) -> float:
         """Calculate the normalized innovation squared for ekfstate at z in sensor_state"""
 
@@ -169,7 +200,7 @@ class EKF:
         return NIS
 
     @classmethod
-    def estimate(cls, ekfstate: GaussParams):
+    def estimate(cls, ekfstate: GaussParams) -> GaussParams:
         """Get the estimate from the state with its covariance. (Compatibility method)"""
         return ekfstate
 
@@ -177,6 +208,7 @@ class EKF:
         self,
         z: np.ndarray,
         ekfstate: GaussParams,
+        *,
         sensor_state: Optional[Dict[str, Any]] = None,
     ) -> float:
         """Calculate the log likelihood of ekfstate at z in sensor_state"""
@@ -190,7 +222,7 @@ class EKF:
         # alternative self.NIS(...) /2 or v @ la.solve(S, v)/2
 
         logdetSby2 = np.log(cholS.diagonal()).sum()
-        # alternative use la.slogdet(S)
+        # alternative use la.slogdet(S), or np.log(la.det(S))
 
         ll = -(NISby2 + logdetSby2 + self._MLOG2PIby2)
 
@@ -209,5 +241,16 @@ class EKF:
         x_reduced, P_reduced = mixturereduction.gaussian_mixture_moments(w, x, P)
         return GaussParams(x_reduced, P_reduced)
 
+    def gate(
+        self,
+        z: np.ndarray,
+        ekfstate: GaussParams,
+        gate_size_square: float,
+        *,
+        sensor_state: Optional[Dict[str, Any]],
+    ) -> bool:
+        """ Check if z is inside sqrt(gate_sized_squared)-sigma ellipse of ekfstate in sensor_state """
+        NIS = self.NIS(z, ekfstate, sensor_state=sensor_state)
 
-# %% End
+        raise NotImplementedError  # TODO: remove this line when implemented
+        return None  # TODO: a simple comparison should suffice here

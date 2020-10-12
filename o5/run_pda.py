@@ -1,26 +1,32 @@
 #%%
+#%%
+
+#import argparse
+#parser = argparse.ArgumentParser()
+#parser.add_argument('-O', action='store_true')
+
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import scipy.io
 import scipy.stats
 
+import gaussparams 
 import dynamicmodels
 import measurementmodels
+import estimationstatistics as estats
 import ekf
+#import imm
 import pda
 
 # %% plot config check and style setup
-
-# to see your plot config
 print(f"matplotlib backend: {matplotlib.get_backend()}")
 print(f"matplotlib config file: {matplotlib.matplotlib_fname()}")
-print(f"matplotlib config dir: {matplotlib.get_configdir()}")
+print(f"matplotlib config dir: {matplotlib.get_configdir()}\n")
 plt.close("all")
 
 # set styles
 try:
-    # installed with "pip install SciencePLots" (https://github.com/garrettj403/SciencePlots.git)
     # gives quite nice plots
     plt_styles = ["science", "grid", "bright", "no-latex"]
     plt.style.use(plt_styles)
@@ -43,7 +49,6 @@ except Exception as e:
             "legend.numpoints": 1,
         }
     )
-
 # %%
 use_pregen = True
 data_file_name = "data_for_pda.mat"
@@ -96,60 +101,64 @@ th = ax2.set_title(f"measurements at step 0")
 ax2.axis([0, 700, -100, 300])
 plotpause = 0.003
 # sets a pause in between time steps if it goes to fast
-for k, Zk in enumerate(Z):
+"""for k, Zk in enumerate(Z):
     sh.set_offsets(Zk)
     th.set_text(f"measurements at step {k}")
     fig2.canvas.draw_idle()
     plt.show(block=False)
     plt.pause(plotpause)
-# %%
+"""# %%
+# Tuning
 
-sigma_a = 5# TODO
-sigma_z = 5# TODO
+sigma_a           = 4.2
+sigma_z           = 2.8
+PD                = 0.9
+clutter_intensity = 1e-3
+gate_size         = 3
 
-PD = 0.5# TODO
-clutter_intensity = 2# TODO
-gate_size = 100# TODO
+# Initialize
 
-dynamic_model = dynamicmodels.WhitenoiseAccelleration(sigma_a)
+dynamic_model     = dynamicmodels.WhitenoiseAccelleration(sigma_a)
 measurement_model = measurementmodels.CartesianPosition(sigma_z)
-ekf_filter = ekf.EKF(dynamic_model, measurement_model)
-
-tracker = pda.PDA(ekf_filter, clutter_intensity, PD, gate_size)
+ekf_filter        = ekf.EKF(dynamic_model, measurement_model)
+#imm_filter        = imm.IMM(ekf_filter, measurement_model)
+tracker           = pda.PDA(ekf_filter, clutter_intensity, PD, gate_size)
 
 # allocate
-NEES = np.zeros(K)
+NEES    = np.zeros(K)
 NEESpos = np.zeros(K)
 NEESvel = np.zeros(K)
 
-# initialize
 x_bar_init = np.array([*Z[0][true_association[0] - 1], 0, 0])
+x_bar_init= np.array([30, -70, 10, 10])
 
 P_bar_init = np.zeros((4, 4))
 P_bar_init[[0, 1], [0, 1]] = 2 * sigma_z ** 2
-P_bar_init[[2, 3], [2, 3]] = 10 ** 2
-
-init_state = tracker.init_filter_state({"mean": x_bar_init, "cov": P_bar_init})
-
-tracker_update = init_state
-tracker_update_list = []
+P_bar_init[[2, 3], [2, 3]] = 20 ** 2
+init_state = gaussparams.GaussParams(x_bar_init, P_bar_init)
+tracker_update       = init_state
+tracker_update_list  = []
 tracker_predict_list = []
+
 # estimate
+
 for k, (Zk, x_true_k) in enumerate(zip(Z, Xgt)):
-    tracker_predict = # TODO
-    tracker_update = # TODO
-    NEES[k] = # TODO
-    NEESpos[k] = # TODO
-    NEESvel[k] = # TODO
+    tracker_predict = tracker.predict(init_state, Ts) 
+    tracker_update  = tracker.update(Zk, filter_state=tracker_predict) #hva med sensor_state
+    updated_state = tracker_update.mean
+    updated_cov   = tracker_update.cov
+    NEES[k]    = estats.NEES(updated_state, updated_cov, x_true_k, idxs=np.arange(4))
+    #NEESpos[k] = estats.NEES(updated_state, updated_cov, x_true_k, idxs=np.arange(2))
+    #NEESvel[k] = estats.NEES(updated_state, updated_cov, x_true_k, idxs=np.arange(2, 4))
 
     tracker_predict_list.append(tracker_predict)
     tracker_update_list.append(tracker_update)
 
 x_hat = np.array([upd.mean for upd in tracker_update_list])
-# calculate a performance metric
-posRMSE = # TODO: position RMSE
-velRMSE = # TODO: velocity RMSE
 
+# calculate a performance metric
+posRMSE = np.sqrt(np.mean(np.sum((x_hat[:,:2]-Xgt[:,:2])**2,axis=1)))
+velRMSE = np.sqrt(np.mean(np.sum((x_hat[:,2:4]-Xgt[:,2:4])**2,axis=1)))
 # %% plots
 fig3, ax3 = plt.subplots(num=3, clear=True)
 ax3.plot(*x_hat.T[:2], label=r"$\hat x$")
@@ -158,9 +167,10 @@ ax3.set_title(
     rf"$\sigma_a = {sigma_a:.3f}$, \sigma_z = {sigma_z:.3f}, posRMSE = {posRMSE:.2f}, velRMSE = {velRMSE:.2f}"
 )
 
+
 fig4, axs4 = plt.subplots(3, sharex=True, num=4, clear=True)
 
-confprob = # TODO: probability for confidence interval
+confprob = 0.9#0.9 TODO: probability for confidence interval
 CI2 = # TODO: confidence interval for NEESpos and NEESvel
 CI4 = # TODO: confidence interval for NEES
 
@@ -199,3 +209,4 @@ axs5[0].set_ylabel("position error")
 axs5[1].plot(np.arange(K) * Ts, np.linalg.norm(x_hat[:, 2:4] - Xgt[:, 2:4], axis=1))
 axs5[1].set_ylabel("velocity error")
 # %%
+"""

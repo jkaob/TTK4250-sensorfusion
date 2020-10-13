@@ -34,7 +34,6 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
         M = Z.shape[0]
         g_squared = self.gate_size**2
 
-        # for loop over elements of Z using self.state_filter.gate
         gated = np.array([
             self.state_filter.gate(z, filter_state, g_squared, sensor_state=sensor_state) 
             for z in Z], 
@@ -55,7 +54,6 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
         log_PND = np.log(1 - self.PD) 
         log_clutter = np.log(self.clutter_intensity)
 
-        # allocate
         ll = np.empty(Z.shape[0] + 1)
 
         # calculate log likelihood ratios
@@ -73,7 +71,7 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
                         #(normalized likelihood ratios)
         """calculate the poseterior event/association probabilities."""
 
-        lls = self.loglikelihood_ratios(Z, filter_state, sensor_state=sensor_state)
+        lls  = self.loglikelihood_ratios(Z, filter_state, sensor_state=sensor_state)
         beta = np.exp(lls - scipy.special.logsumexp(lls))
         return beta
 
@@ -87,8 +85,7 @@ class PDA(Generic[ET]):  # Probabilistic Data Association
         
         conditional_update = [filter_state] + [self.state_filter.update(z, filter_state, sensor_state=sensor_state) for z in Z]
         return conditional_update
-        # i think we find x hat ??
-        
+    
     def reduce_mixture(
         self, mixture_filter_state: MixtureParameters[ET]
     ) -> ET:  # the two first moments of the mixture

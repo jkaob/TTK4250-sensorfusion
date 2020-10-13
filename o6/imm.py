@@ -222,7 +222,6 @@ class IMM(Generic[MT]):
 
         # weighted average of likelihoods (not log!)
         ll = logsumexp(mode_conditioned_ll, b = immstate.weights)
-        #hva skjer her egentlig
         
         assert np.isfinite(ll), "IMM.loglikelihood: ll not finite"
         assert isinstance(ll, float) or isinstance(
@@ -249,7 +248,7 @@ class IMM(Generic[MT]):
             [c.weights.ravel() for c in immstate_mixture.components]   # Pr{s|a}
         )
 
-        # input:  Pr(a), Pr(s|a)     
+        # input:  Pr(a), Pr(s|a)
         # output: Pr(s), Pr(a|s)
         mode_prob, mode_conditioned_component_prob = discretebayes.discrete_bayes(weights, component_conditioned_mode_prob)
 
@@ -257,7 +256,6 @@ class IMM(Generic[MT]):
         mode_states: List[GaussParams] = []  # state params from associations for mode s
             
         for (s, pr_a_given_s) in zip(range(num_modes), mode_conditioned_component_prob):
-            #~The mode s for association j should be available as imm_mixture.components[j].components[s]
             
             # gather all state params from associations for mode s into a list:
             mode_cond_params = np.array([c.components[s] for c in immstate_mixture.components])
@@ -339,148 +337,3 @@ class IMM(Generic[MT]):
 
         NEES = self.filters[0].NEES(est, x_true, idx=idx)  # HACK?
         return NEES, NEESes
-
-""" 
-    @singledispatchmethod
-    def init_filter_state(
-        self,
-        init,  # Union[
-        #     MixtureParameters, Dict[str, Any], Tuple[Sequence, Sequence], Sequence
-        # ],
-    ) -> MixtureParameters:
-        
-        Initialize the imm state to MixtureParameters.
-
-        - If mode probabilities are not found they are initialized from self.initial_mode_probabilities.
-        - If only one mode state is found, it is broadcasted to all modes.
-
-        MixtureParameters: goes unaltered
-        dict:
-            ["weights", "probs", "probabilities", "mode_probs"]
-                in this order can signify mode probabilities
-            ["components", "modes"] signify the modes
-        tuple: first element is mode probabilities and second is mode states
-        Sequence: assumed to be only the mode states
-
-        mode probabilities: array_like
-        components:
-        # TODO there are cases where MP unaltered can lead to trouble
-
-        raise NotImplementedError(
-            f"IMM do not know how to initialize a immstate from: {init}"
-        )
-
-    @init_filter_state.register
-    def _(self, init: MixtureParameters[MT]) -> MixtureParameters[MT]:
-        return init
-
-    @init_filter_state.register(dict)
-    def _(self, init: dict) -> MixtureParameters[MT]:
-        # extract weights
-        got_weights = False
-        got_components = False
-        for key in init:
-            if not got_weights and key in [
-                "weights",
-                "probs",
-                "probabilities",
-                "mode_probs",
-            ]:
-                weights = np.asfarray([key])
-                got_weights = True
-            elif not got_components and key in ["components", "modes"]:
-                components = self.init_components(init[key])
-                got_components = True
-
-        if not got_weights:
-            weights = self.initial_mode_probabilities
-
-        if not got_components:
-            components = self.init_components(init)
-
-        assert np.allclose(weights.sum(), 1), "Mode probabilities must sum to 1 for"
-
-        return MixtureParameters(weights, components)
-
-    @init_filter_state.register(tuple)
-    def _(self, init: tuple) -> MixtureParameters[MT]:
-        assert isinstance(init[0], Sized) and len(init[0]) == len(
-            self.filters
-        ), f"To initialize from tuple the first element must be of len(self.filters)={len(self.filters)}"
-
-        weights = np.asfarray(init[0])
-        components = self.init_compontents(init[1])
-        return MixtureParameters(weights, components)
-
-    @init_filter_state.register(Sequence)
-    def _(self, init: Sequence) -> MixtureParameters[MT]:
-        weights = self.initial_mode_probabilities
-        components = self.init_components(init)
-        return MixtureParameters(weights, components)
-
-    @singledispatchmethod
-    def init_components(self, init: "Union[Iterable, MT_like]") -> List[MT]:
-        Make an instance or Iterable of the Mode Parameters into a list of mode parameters
-        return [fs.init_filter_state(init) for fs in self.filters]
-
-    @init_components.register(dict)
-    def _(self, init: dict):
-        return [fs.init_filter_state(init) for fs in self.filters]
-
-    @init_components.register(Iterable)
-    def _(self, init: Iterable) -> List[MT]:
-        if isinstance(init[0], (np.ndarray, list)):
-            return [
-                fs.init_filter_state(init_s) for fs, init_s in zip(self.filters, init)
-            ]
-        else:
-            return [fs.init_filter_state(init) for fs in self.filters]
-
-    def estimate_sequence(
-        self,
-        # A sequence of measurements
-        Z: Sequence[np.ndarray],
-        # the initial KF state to use for either prediction or update (see start_with_prediction)
-        init_immstate: MixtureParameters,
-        # Time difference between Z's. If start_with_prediction: also diff before the first Z
-        Ts: Union[float, Sequence[float]],
-        *,
-        # An optional sequence of the sensor states for when Z was recorded
-        sensor_state: Optional[Iterable[Optional[Dict[str, Any]]]] = None,
-        # sets if Ts should be used for predicting before the first measurement in Z
-        start_with_prediction: bool = False,
-    ) -> Tuple[List[MixtureParameters], List[MixtureParameters], List[GaussParams]]:
-        Create estimates for the whole time series of measurements.
-
-        # sequence length
-        K = len(Z)
-
-        # Create and amend the sampling array
-        Ts_start_idx = int(not start_with_prediction)
-        Ts_arr = np.empty(K)
-        Ts_arr[Ts_start_idx:] = Ts
-        # Insert a zero time prediction for no prediction equivalence
-        if not start_with_prediction:
-            Ts_arr[0] = 0
-
-        # Make sure the sensor_state_list actually is a sequence
-        sensor_state_seq = sensor_state or [None] * K
-
-        init_immstate = self.init_filter_state(init_immstate)
-
-        immstate_upd = init_immstate
-
-        immstate_pred_list = []
-        immstate_upd_list = []
-        estimates = []
-
-        for z_k, Ts_k, ss_k in zip(Z, Ts_arr, sensor_state_seq):
-            immstate_pred = self.predict(immstate_upd, Ts_k)
-            immstate_upd = self.update(z_k, immstate_pred, sensor_state=ss_k)
-
-            immstate_pred_list.append(immstate_pred)
-            immstate_upd_list.append(immstate_upd)
-            estimates.append(self.estimate(immstate_upd))
-
-        return immstate_pred_list, immstate_upd_list, estimates
-        """

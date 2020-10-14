@@ -19,12 +19,10 @@ from typing import (
 from mixturedata import MixtureParameters
 from gaussparams import GaussParams
 from estimatorduck import StateEstimator
-from singledispatchmethod import singledispatchmethod
 
 # packages
 from dataclasses import dataclass
 
-# from singledispatchmethod import singledispatchmethod
 import numpy as np
 from scipy import linalg
 from scipy.special import logsumexp

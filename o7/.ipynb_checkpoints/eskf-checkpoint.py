@@ -114,15 +114,15 @@ class ESKF:
 
         R = quaternion_to_rotation_matrix(quaternion, debug=self.debug)
         acceleration_ned = R @ acceleration
-        velocity_ned     = R @ velocity
+        velocity_ned     = R @ velocity   #TODO: Sjekk om dette allerde er i Ned
         omega_ned        = R @ omega
-        
+
         #: Calculate predicted position (in NED)
         position_prediction = position + Ts*velocity_ned + acceleration_ned*Ts**2/2
-        
+
         #: Calculate predicted velocity (in NED)
         velocity_prediction = velocity_ned + Ts*acceleration_ned
-        
+
         #: Calculate predicted quaternion. Assuming constant omega
         K      = Ts*omega_ned
         norm_K = np.linalg.norm(k)
@@ -130,15 +130,15 @@ class ESKF:
         quaternion_prediction = quaternion_product(quaternion, exp_K)
 
         #: Normalize quaternion
-        quaternion_prediction = quaternion_prediction / np.linalg.norm(quaternion_prediction)
+        quaternion_prediction = quaternion_normalize(quaternion_prediction)
 
         #: Calculate predicted acceleration bias
         p_a_b     = self.p_acc
-        acceleration_bias_prediction = acceleration_bias + Ts*(-p_a_b * np.eye(3,3) @ acceleration_bias)  
+        acceleration_bias_prediction = acceleration_bias + Ts*(-p_a_b * np.eye(3,3) @ acceleration_bias)
         #: Calculate predicted gyroscope bias
         p_omega_b = self.p_gyro
         gyroscope_bias_prediction = gyroscope_bias + Ts * (- p_omega_b * np.eye(3,3) @ gyroscope_bias)
-        
+
         x_nominal_predicted = np.concatenate((
                 position_prediction,
                 velocity_prediction,
@@ -268,19 +268,19 @@ class ESKF:
         G = self.Gerr(x_nominal)
         Q = self.Q_err
         I = np.eye(3,3)
-        
+
         UP_RIGHT   = CatSlice(start = 0,  stop = 15) * CatSlice(start = 15, stop = 30)
         DOWN_RIGHT = CatSlice(start = 15, stop = 30) * CatSlice(start = 15, stop = 30)
         V = np.zeros((30, 30))
         V[UP_RIGHT]   = G @ Q @ G.T * Ts
         V[DOWN_RIGHT] = A.T * Ts
-        
+
         assert V.shape == (
             30,
             30,
         ), f"ESKF.discrete_error_matrices: Van Loan matrix shape incorrect {omega.shape}"
         VanLoanMatrix = la.expm(V)  # This can be slow...
-        
+
         VanLoanMatrix[UP_RIGHT]   = I + V[UP_RIGHT] + V[UP_RIGHT] @ V[UP_RIGHT]*0.5
         VanLoanMatrix[DOWN_RIGHT] = I + V[DOWN_RIGHT] + V[DOWN_RIGHT] @ V[DOWN_RIGHT]*0.5
 
@@ -396,7 +396,7 @@ class ESKF:
 
         # perform prediction
         x_nominal_predicted = self.predict_nominal(x_nominal, acceleration, omega, Ts)
-        P_predicted = self.predict_covariance(x_nominal, P, acceleration, omega, Ts)
+        P_predicted   = self.predict_covariance(x_nominal, P, acceleration, omega, Ts)
 
         assert x_nominal_predicted.shape == (
             16,
@@ -444,16 +444,23 @@ class ESKF:
         x_injected = x_nominal.copy()
         #: Inject error state into nominal state, except attitude
         x_injected[INJ_IDX] = x_nominal[INJ_IDX] + delta_x[DTX_IDX]
-        # TODO: Inject attitude
-        q_nominal = x_nominal[ATT_IDX]
-        ....
-        # TODO: Normalize quaternion
+        #: Inject attitude
 
-        # Covariance
-        G_injected = np.zeros((1,))  # TODO: Compensate for injection in the covariances
-        P_injected = np.zeros(
-            (15, 15)
-        )  # TODO: Compensate for injection in the covariances
+        q_nominal  = x_nominal[ATT_IDX]
+        q_delta    = np.array([1, 0.5*delta_x[ERR_ATT_IDK]]).reshape(4,)
+        q_injected = quaternion_product(q_nominal, q_delta)
+        q_injected = q_injected/np.linalg.norm(q_injected)
+
+        print("q_nom: ", q_nominal, "\nq_delta: ", q_delta)
+
+        #: Compensate for injection in the covariances
+        G_injected = np.zeros((15,15))
+        G_injected[0:6,  0:6]  = np.eye(6)
+        G_injected[6:9,  6:9]  = np.eye(3)- cross_product_matrix(0.5*delta_x[ERR_ATT_IDK])
+        G_injected[9:15, 9:15] = np.eye(6)
+        print("G_injected = ", G_injected)
+
+        P_injected = G_injected @ P @ G_injected.T
 
         assert x_injected.shape == (
             16,
@@ -507,9 +514,13 @@ class ESKF:
             3,
         ), f"ESKF.innovation_GNSS: lever_arm shape incorrect {lever_arm.shape}"
 
-        H = np.zeros((1,))  # TODO: measurement matrix
+        #: measurement matrix, only measures position
+        Hx = np.concatenate((np.eye(3), np.zeros(3,13)), axis=1)
+        print("shape of Hx: ", Hx.shape)
 
-        v = np.zeros((3,))  # TODO: innovation
+        #: innovation
+        z_hat = Hx @ x_nominal
+        v     = z_GNSS_position - z_hat
 
         # leverarm compensation
         if not np.allclose(lever_arm, 0):
@@ -517,11 +528,19 @@ class ESKF:
             H[:, ERR_ATT_IDX] = -R @ cross_product_matrix(lever_arm, debug=self.debug)
             v -= R @ lever_arm
 
-        S = np.zeros((3, 3))  # TODO: innovation covariance
+        #: innovation covariance
+        eta, e1, e2, e3 = x_nominal[ATT_IDX].ravel()
+        Q_dt = 0.5*np.array([-e1, -e2, -e3,
+                            eta, -e3, e2,
+                            e3, eta, -e1,
+                            -e2, e1, eta]).reshape(4,3)
+        X_dx = la.block_diag(np.eye(3), Q_dt, np.eye(3))
+        H    = Hx @ X_dx
+        S    = H @ P @ H.T + R_GNSS
 
         assert v.shape == (3,), f"ESKF.innovation_GNSS: v shape incorrect {v.shape}"
         assert S.shape == (3, 3), f"ESKF.innovation_GNSS: S shape incorrect {S.shape}"
-        return v, S
+        return v, S, H
 
     def update_GNSS_position(
         self,
@@ -566,24 +585,25 @@ class ESKF:
 
         I = np.eye(*P.shape)
 
-        innovation, S = self.innovation_GNSS_position(
+        innovation, S, H = self.innovation_GNSS_position(
             x_nominal, P, z_GNSS_position, R_GNSS, lever_arm
         )
-
-        H = np.zeros((1,))  # TODO: measurement matrix
 
         # in case of a specified lever arm
         if not np.allclose(lever_arm, 0):
             R = quaternion_to_rotation_matrix(x_nominal[ATT_IDX], debug=self.debug)
             H[:, ERR_ATT_IDX] = -R @ cross_product_matrix(lever_arm, debug=self.debug)
 
-        # KF error state update
-        W = np.zeros((1,))  # TODO: Kalman gain
-        delta_x = np.zeros((15,))  # TODO: delta x
+        assert H.shape == (
+            3, 15,
+        ), f"ESKF.innovation_GNSS: X_delta_x shape incorrect {H.shape}"
 
-        Jo = I - W @ H  # for Joseph form
+        #: KF error state update
+        W       = P @ H.T @ la.inv(H @ P @ H.T + R)
+        delta_x = W @ innovation
 
-        P_update = np.zeros((15, 15))  # TODO: P update
+        Jo       = I - W @ H
+        P_update = Jo @ P @ Jo.T + W @ R @ W.T
 
         # error state injection
         x_injected, P_injected = self.inject(x_nominal, delta_x, P_update)
@@ -638,18 +658,19 @@ class ESKF:
             3,
         ), "ESKF.NIS_GNSS: lever_arm shape incorrect " + str(lever_arm.shape)
 
-        v, S = self.innovation_GNSS_position(
-            x_nominal, P, z_GNSS_position, R_GNSS, lever_arm
-        )
+        v, S, _ = self.innovation_GNSS_position(
+            x_nominal, P, z_GNSS_position, R_GNSS, lever_arm )
 
-        NIS = 0  # TODO: Calculate NIS
+        NIS = v.T @ la.inv(S) @ v
 
         assert NIS >= 0, "EKSF.NIS_GNSS_positionNIS: NIS not positive"
-
         return NIS
 
     @classmethod
-    def delta_x(cls, x_nominal: np.ndarray, x_true: np.ndarray,) -> np.ndarray:
+    def delta_x(cls,
+        x_nominal: np.ndarray,
+        x_true: np.ndarray,
+        ) -> np.ndarray:
         """Calculates the error state between x_nominal and x_true
 
         Args:
@@ -670,22 +691,19 @@ class ESKF:
             16,
         ), f"ESKF.delta_x: x_true shape incorrect {x_true.shape}"
 
-        delta_position = np.zeros((3,))  # TODO: Delta position
-        delta_velocity = np.zeros((3,))  # TODO: Delta velocity
+        delta_position = x_nominal[POS_IDX] - x_true[POS_IDX]
+        delta_velocity = x_nominal[VEL_IDX] - x_true[VEL_IDX]
 
-        quaternion_conj = np.array([1, 0, 0, 0])  # TODO: Conjugate of quaternion
-
-        delta_quaternion = np.array([1, 0, 0, 0])  # TODO: Error quaternion
-        delta_theta = np.zeros((3,))
+        quaternion_conj  = quaternion_conjugate(x_nominal[ATT_IDX])
+        delta_quaternion = quaternion_product(quaternion_conj, x_true[ATT_IDX])
+        delta_theta      = 2*delta_quaternion[1:]
 
         # Concatenation of bias indices
         BIAS_IDX = ACC_BIAS_IDX + GYRO_BIAS_IDX
-        delta_bias = np.zeros((6,))  # TODO: Error biases
+        delta_bias = x_nominal[BIAS_IDX] - x_true[BIAS_IDX]
 
         d_x = np.concatenate((delta_position, delta_velocity, delta_theta, delta_bias))
-
         assert d_x.shape == (15,), f"ESKF.delta_x: d_x shape incorrect {d_x.shape}"
-
         return d_x
 
     @classmethod
@@ -714,14 +732,17 @@ class ESKF:
             16,
         ), f"ESKF.NEES: x_true shape incorrect {x_true.shape}"
 
-        d_x = cls.delta_x(x_nominal, x_true)
+        d_x   = cls.delta_x(x_nominal, x_true)
 
-        NEES_all = 0  # TODO: NEES all
-        NEES_pos = 0  # TODO: NEES position
-        NEES_vel = 0  # TODO: NEES velocity
-        NEES_att = 0  # TODO: NEES attitude
-        NEES_accbias = 0  # TODO: NEES accelerometer bias
-        NEES_gyrobias = 0  # TODO: NEES gyroscope bias
+        # Total NEES
+        NEES_all = d_x.T @ la.inv(P) @ d_x
+        # Pos, vel, att NEES
+        NEES_pos = d_x[POS_IDX].T     @ la.inv(P[POS_IDX, POS_IDX])         @ d_x[POS_IDX]
+        NEES_vel = d_x[VEL_IDX].T     @ la.inv(P[VEL_IDX, VEL_IDX])         @ d_x[VEL_IDX]
+        NEES_att = d_x[ERR_ATT_IDX].T @ la.inv(P[ERR_ATT_IDX, ERR_ATT_IDX]) @ d_x[ERR_ATT_IDX]
+        #Bias NEESes
+        NEES_accbias  = d_x[ERR_ACC_BIAS_IDX].T    @ la.inv(P[ERR_ACC_BIAS_IDX, ERR_ACC_BIAS_IDX])   @ d_x[ERR_ACC_BIAS_IDX]
+        NEES_gyrobias = d_x[ERR_GYRO_BIAS_IDX].T   @ la.inv(P[ERR_GYRO_BIAS_IDX, ERR_GYRO_BIAS_IDX]) @ d_x[ERR_GYRO_BIAS_IDX]
 
         NEESes = np.array(
             [NEES_all, NEES_pos, NEES_vel, NEES_att, NEES_accbias, NEES_gyrobias]

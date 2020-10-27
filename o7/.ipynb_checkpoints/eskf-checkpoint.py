@@ -176,10 +176,10 @@ class ESKF:
         A = np.zeros((15, 15))
 
         # Set submatrices
-        A[POS_IDX * VEL_IDX]                = np.eye(3)
-        A[VEL_IDX * ERR_ATT_IDX]            = -R @ cross_product_matrix(acceleration)
-        A[VEL_IDX * ERR_ACC_BIAS_IDX]       = -R
-        A[ERR_ATT_IDX * ERR_ATT_IDX]        = -cross_product_matrix(omega)
+        A[POS_IDX * VEL_IDX]                     = np.eye(3)
+        A[VEL_IDX * ERR_ATT_IDX]                 = -R @ cross_product_matrix(acceleration)
+        A[VEL_IDX * ERR_ACC_BIAS_IDX]            = -R
+        A[ERR_ATT_IDX * ERR_ATT_IDX]             = -cross_product_matrix(omega)
         A[ERR_ATT_IDX * ERR_GYRO_BIAS_IDX]       = -np.eye(3)
         A[ERR_ACC_BIAS_IDX * ERR_ACC_BIAS_IDX]   = -(self.p_acc)  * np.eye(3)
         A[ERR_GYRO_BIAS_IDX * ERR_GYRO_BIAS_IDX] = -(self.p_gyro) * np.eye(3)
@@ -679,16 +679,16 @@ class ESKF:
             16,
         ), f"ESKF.delta_x: x_true shape incorrect {x_true.shape}"
 
-        delta_position = x_nominal[POS_IDX] - x_true[POS_IDX]
-        delta_velocity = x_nominal[VEL_IDX] - x_true[VEL_IDX]
+        delta_position = x_true[POS_IDX] - x_nominal[POS_IDX]# - x_true[POS_IDX]
+        delta_velocity = x_true[VEL_IDX] - x_nominal[VEL_IDX]# - x_true[VEL_IDX]
 
-        quaternion_conj  = quaternion_conjugate(x_nominal[ATT_IDX])
-        delta_quaternion = quaternion_product(quaternion_conj, x_true[ATT_IDX])
+        quaternion_conj  = quaternion_conjugate(x_true[ATT_IDX])
+        delta_quaternion = quaternion_product(quaternion_conj, x_nominal[ATT_IDX])
         delta_theta      = 2*delta_quaternion[1:]
 
         # Concatenation of bias indices
         BIAS_IDX   = ACC_BIAS_IDX + GYRO_BIAS_IDX
-        delta_bias = x_nominal[BIAS_IDX] - x_true[BIAS_IDX]
+        delta_bias = x_true[BIAS_IDX] - x_nominal[BIAS_IDX]# - x_true[BIAS_IDX]
 
         d_x = np.concatenate((delta_position, delta_velocity, delta_theta, delta_bias))
         assert d_x.shape == (15,), f"ESKF.delta_x: d_x shape incorrect {d_x.shape}"

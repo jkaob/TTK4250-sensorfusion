@@ -17,10 +17,10 @@ def quaternion_product(ql: np.ndarray, qr: np.ndarray) -> np.ndarray:
         np.ndarray: Quaternion product of ql and qr of shape (4,)s
     """
     if ql.shape == (4,):
-        eta_left = ql[0]
+        eta_left     = ql[0]
         epsilon_left = ql[1:].reshape((3, 1))
     elif ql.shape == (3,):
-        eta_left = 0
+        eta_left     = 0
         epsilon_left = ql.reshape((3, 1))
     else:
         raise RuntimeError(
@@ -28,13 +28,13 @@ def quaternion_product(ql: np.ndarray, qr: np.ndarray) -> np.ndarray:
         )
 
     if qr.shape == (4,):
-        eta_right = qr[0]
+        eta_right     = qr[0]
         epsilon_right = qr[1:].reshape((3, 1))
-        q_right = qr.copy()
+        q_right       = qr.copy()
     elif qr.shape == (3,):
-        eta_right = 0
+        eta_right     = 0
         epsilon_right = qr.reshape((3, 1))
-        q_right = np.concatenate(([0], qr))
+        q_right       = np.concatenate(([0], qr))
     else:
         raise RuntimeError(
             f"utils.quaternion_product: Quaternion multiplication error, right quaternion wrong shape: {qr.shape}"
@@ -70,10 +70,10 @@ def quaternion_to_rotation_matrix(
         np.ndarray: Rotation matrix of shape (3, 3)
     """
     if quaternion.shape == (4,):
-        eta = quaternion[0]
+        eta     = quaternion[0]
         epsilon = quaternion[1:]
     elif quaternion.shape == (3,):
-        eta = 0
+        eta     = 0
         epsilon = quaternion.copy()
     else:
         raise RuntimeError(
@@ -109,11 +109,9 @@ def quaternion_to_euler(quaternion: np.ndarray) -> np.ndarray:
     assert quaternion.shape == ( 4,
     ), f"quaternion.quaternion_to_euler: Quaternion shape incorrect {quaternion.shape}"
 
-    quaternion_squared = quaternion ** 2
-
-
     #: Convert directly from quaternions to euler angles, eq 10.38
     eta, eps1, eps2, eps3  = quaternion.ravel()
+    
     phi   = np.arctan2(2*(eps3*eps2 + eta*eps1), eta**2 - eps1**2 - eps2**2 + eps3**2)
     theta = np.arcsin(2*(eta*eps2 - eps1*eps3))
     psi   = np.arctan2(2*(eps1*eps2 + eta*eps3), eta**2 + eps1**2 - eps2**2 - eps3**2)

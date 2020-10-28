@@ -13,24 +13,24 @@ from utils import cross_product_matrix
 
 
 # %% indices
-POS_IDX = CatSlice(start=0, stop=3)
-VEL_IDX = CatSlice(start=3, stop=6)
-ATT_IDX = CatSlice(start=6, stop=10)
-ACC_BIAS_IDX = CatSlice(start=10, stop=13)
-GYRO_BIAS_IDX = CatSlice(start=13, stop=16)
+POS_IDX         = CatSlice(start=0, stop=3)
+VEL_IDX         = CatSlice(start=3, stop=6)
+ATT_IDX         = CatSlice(start=6, stop=10)
+ACC_BIAS_IDX    = CatSlice(start=10, stop=13)
+GYRO_BIAS_IDX   = CatSlice(start=13, stop=16)
 
-ERR_ATT_IDX = CatSlice(start=6, stop=9)
-ERR_ACC_BIAS_IDX = CatSlice(start=9, stop=12)
-ERR_GYRO_BIAS_IDX = CatSlice(start=12, stop=15)
+ERR_ATT_IDX         = CatSlice(start=6, stop=9)
+ERR_ACC_BIAS_IDX    = CatSlice(start=9, stop=12)
+ERR_GYRO_BIAS_IDX   = CatSlice(start=12, stop=15)
 
 
 # %% The class
 @dataclass
 class ESKF:
-    sigma_acc: float
+    sigma_acc:  float
     sigma_gyro: float
 
-    sigma_acc_bias: float
+    sigma_acc_bias:  float
     sigma_gyro_bias: float
 
     p_acc:  float = 0
@@ -52,9 +52,9 @@ class ESKF:
 
         self.Q_err = (
             la.block_diag(
-                self.sigma_acc * np.eye(3),
-                self.sigma_gyro * np.eye(3),
-                self.sigma_acc_bias * np.eye(3),
+                self.sigma_acc       * np.eye(3),
+                self.sigma_gyro      * np.eye(3),
+                self.sigma_acc_bias  * np.eye(3),
                 self.sigma_gyro_bias * np.eye(3),
             ) ** 2
         )
@@ -92,11 +92,11 @@ class ESKF:
         ), f"ESKF.predict_nominal: omega incorrect shape {omega.shape}"
 
         # Extract states
-        position   = x_nominal[POS_IDX]
-        velocity   = x_nominal[VEL_IDX]
-        quaternion = x_nominal[ATT_IDX]
-        acceleration_bias = x_nominal[ACC_BIAS_IDX]
-        gyroscope_bias    = x_nominal[GYRO_BIAS_IDX]
+        position            = x_nominal[POS_IDX]
+        velocity            = x_nominal[VEL_IDX]
+        quaternion          = x_nominal[ATT_IDX]
+        acceleration_bias   = x_nominal[ACC_BIAS_IDX]
+        gyroscope_bias      = x_nominal[GYRO_BIAS_IDX]
 
         if self.debug:
             assert np.allclose(
@@ -108,16 +108,13 @@ class ESKF:
 
         R = quaternion_to_rotation_matrix(quaternion, debug=self.debug)
         acceleration_ned = R @ acceleration + self.g
-        omega_ned        = R @ omega   #TODO: Denne i NED ?
 
-        #: Calculate predicted position (in NED)
+        #: Calculate predicted position and velocity (in NED)
         position_prediction = position + Ts*velocity + acceleration_ned*(Ts**2)/2
-
-        #: Calculate predicted velocity (in NED)
         velocity_prediction = velocity + Ts*acceleration_ned
 
         #: Calculate predicted quaternion. Assuming constant omega
-        K      = Ts*omega
+        K      = Ts * omega
         norm_K = np.linalg.norm(K)
         exp_K  = np.array([np.cos(norm_K/2), *(np.sin(norm_K/2)*(K.T/norm_K))])
         quaternion_prediction = quaternion_product(quaternion, exp_K)
@@ -125,11 +122,9 @@ class ESKF:
         #: Normalize quaternion
         quaternion_prediction = quaternion_normalize(quaternion_prediction)
 
-        #: Calculate predicted acceleration, gyroscope bias
-        p_a_b     = self.p_acc
-        acceleration_bias_prediction = acceleration_bias * (1 - Ts*p_a_b)
-        p_omega_b = self.p_gyro
-        gyroscope_bias_prediction    = gyroscope_bias * (1 - Ts*p_omega_b)
+        #: Calculate predicted acceleration, gyroscope
+        acceleration_bias_prediction = acceleration_bias * np.exp(-self.p_acc*Ts)
+        gyroscope_bias_prediction    = gyroscope_bias * np.exp(-self.p_gyro*Ts)
 
         x_nominal_predicted = np.concatenate((
                 position_prediction,
@@ -217,7 +212,6 @@ class ESKF:
         G       = np.zeros((15, 12))
         G_diag  = la.block_diag(-R, -I, I, I)
         G[3:,:] = G_diag
-
         assert G.shape == (15, 12), f"ESKF.Gerr: G-matrix shape incorrect {G.shape}"
         return G
 
@@ -255,15 +249,17 @@ class ESKF:
             3,
         ), f"ESKF.discrete_error_matrices: omega shape incorrect {omega.shape}"
 
+        UP_LEFT    = CatSlice(0,  15) ** 2
+        UP_RIGHT   = CatSlice(0,  15) * CatSlice(15, 30)
+        DOWN_RIGHT = CatSlice(15, 30) ** 2
+
         A = self.Aerr(x_nominal, acceleration, omega)
         G = self.Gerr(x_nominal)
         Q = self.Q_err
-        I_3  = np.eye(3)
-        I_15 = np.eye(15)
 
-        UP_RIGHT   = CatSlice(start = 0,  stop = 15) * CatSlice(start = 15, stop = 30)
-        DOWN_RIGHT = CatSlice(start = 15, stop = 30) ** 2
+
         V = np.zeros((30, 30))
+        V[UP_LEFT]    = -A * Ts
         V[UP_RIGHT]   = G @ Q @ G.T * Ts
         V[DOWN_RIGHT] = A.T * Ts
 
@@ -273,11 +269,10 @@ class ESKF:
         ), f"ESKF.discrete_error_matrices: Van Loan matrix shape incorrect {omega.shape}"
 
         VanLoanMatrix = np.zeros(V.shape)
-        VanLoanMatrix[UP_RIGHT]   = I_15 + V[UP_RIGHT] + V[UP_RIGHT] @ V[UP_RIGHT]*0.5
-        VanLoanMatrix[DOWN_RIGHT] = I_15 + V[DOWN_RIGHT] + V[DOWN_RIGHT] @ V[DOWN_RIGHT]*0.5
+        VanLoanMatrix = np.eye(30) + V + V @ V*0.5
 
-        GQGd = VanLoanMatrix[UP_RIGHT]
         Ad   = VanLoanMatrix[DOWN_RIGHT].T
+        GQGd = Ad @ VanLoanMatrix[UP_RIGHT]
 
         assert Ad.shape == (
             15,
@@ -328,9 +323,7 @@ class ESKF:
             3,
         ), f"ESKF.predict_covariance: omega shape incorrect {omega.shape}"
 
-        Ad, GQGd = self.discrete_error_matrices(x_nominal, acceleration, omega, Ts)
-        Qd       = Ad.T @ Ad  #????????????
-
+        Ad, GQGd    = self.discrete_error_matrices(x_nominal, acceleration, omega, Ts)
         P_predicted = Ad @ P @ Ad.T + GQGd
 
         assert P_predicted.shape == (
@@ -444,10 +437,8 @@ class ESKF:
         x_injected[ATT_IDX] = q_injected/np.linalg.norm(q_injected)
 
         #: Compensate for injection in the covariances
-        G_injected = np.zeros((15,15))
-        G_injected[0:6,  0:6]  = np.eye(6)
-        G_injected[6:9,  6:9]  = np.eye(3) - cross_product_matrix(0.5*delta_x[ERR_ATT_IDX])
-        G_injected[9:15, 9:15] = np.eye(6)
+        G_injected = np.eye(15)
+        G_injected[6:9, 6:9] = np.eye(3) - cross_product_matrix(0.5*delta_x[ERR_ATT_IDX])
 
         P_injected = G_injected @ P @ G_injected.T
 
@@ -576,6 +567,7 @@ class ESKF:
         innovation, S, H = self.innovation_GNSS_position(
             x_nominal, P, z_GNSS_position, R_GNSS, lever_arm
         )
+        H = np.concatenate((np.eye(3), np.zeros((3,12))),axis=1)
 
         # in case of a specified lever arm
         if not np.allclose(lever_arm, 0):
@@ -649,8 +641,7 @@ class ESKF:
         v, S, _ = self.innovation_GNSS_position(
             x_nominal, P, z_GNSS_position, R_GNSS, lever_arm )
 
-        NIS = v.T @ la.inv(S) @ v
-
+        NIS = v.T @ la.solve(S, v)
         assert NIS >= 0, "EKSF.NIS_GNSS_positionNIS: NIS not positive"
         return NIS
 
@@ -740,6 +731,56 @@ class ESKF:
         NEES = diff @ la.solve(P, diff)
         assert NEES >= 0, f"ESKF._NEES: negative NEES: {round(NEES,3)}"
         return NEES
+
+    @classmethod
+    def alternative_NEESes(
+    cls, x_nominal: np.ndarray, P: np.ndarray, x_true: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Calculates some alternativ NEESes for the substates
+
+        Args:
+            x_nominal (np.ndarray): The nominal estimate
+            P (np.ndarray): The error state covariance
+            x_true (np.ndarray): The true state
+
+        Returns:
+            np.ndarray: NEES for [[position, velocity, attitude],[position, velocity],
+            [acceleration_bias, gyroscope_bias]], shape (3,)
+        """
+
+        assert x_nominal.shape == (
+            16,
+        ), f"ESKF.NEES: x_nominal shape incorrect {x_nominal.shape}"
+        assert P.shape == (15, 15), f"ESKF.NEES: P shape incorrect {P.shape}"
+        assert x_true.shape == (
+            16,
+        ), f"ESKF.NEES: x_true shape incorrect {x_true.shape}"
+
+        d_x = cls.delta_x(x_nominal, x_true)
+
+        POS_VEL_ERR_ATT_IDX     = CatSlice(0, stop = 9)
+        POS_VEL_IDX             = CatSlice(0, stop = 6)
+        ERR_ACC_GYRO_BIAS_IDX   = CatSlice(9, stop = 15)
+
+        NEES_pos_vel_att    = cls._NEES(P[POS_VEL_ERR_ATT_IDX**2], d_x[POS_VEL_ERR_ATT_IDX])
+        NEES_pos_vel        = cls._NEES(P[POS_VEL_IDX**2], d_x[POS_VEL_IDX])
+
+        P_pos_att       = la.block_diag(P[POS_IDX**2],P[ERR_ATT_IDX**2])
+        d_x_pos_att     = np.concatenate((d_x[POS_IDX], d_x[ERR_ATT_IDX]))
+        NEES_pos_att    = cls._NEES(P_pos_att,d_x_pos_att)
+
+        P_vel_att       = la.block_diag(P[VEL_IDX**2],P[ERR_ATT_IDX**2])
+        d_x_vel_att     = np.concatenate((d_x[VEL_IDX], d_x[ERR_ATT_IDX]))
+        NEES_vel_att    = cls._NEES(P_vel_att,d_x_vel_att)
+
+        NEES_accbias_gyrobias  = cls._NEES(P[ERR_ACC_GYRO_BIAS_IDX**2],  d_x[ERR_ACC_GYRO_BIAS_IDX])
+
+        NEESes = np.array(
+            [NEES_pos_vel_att, NEES_pos_vel, NEES_pos_att,NEES_vel_att, NEES_accbias_gyrobias]
+        )
+        assert np.all(NEESes >= 0), "ESKF.NEES: one or more negative NEESes"
+        return NEESes
 
 
 # %%

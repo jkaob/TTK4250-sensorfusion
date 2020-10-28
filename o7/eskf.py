@@ -269,7 +269,7 @@ class ESKF:
         ), f"ESKF.discrete_error_matrices: Van Loan matrix shape incorrect {omega.shape}"
 
         VanLoanMatrix = np.zeros(V.shape)
-        VanLoanMatrix = np.eye(30) + V + V @ V*0.5)
+        VanLoanMatrix = np.eye(30) + V + V @ V*0.5
 
         Ad   = VanLoanMatrix[DOWN_RIGHT].T
         GQGd = Ad @ VanLoanMatrix[UP_RIGHT]
@@ -641,8 +641,7 @@ class ESKF:
         v, S, _ = self.innovation_GNSS_position(
             x_nominal, P, z_GNSS_position, R_GNSS, lever_arm )
 
-        NIS = v.T @ la.inv(S) @ v
-
+        NIS = v.T @ la.solve(S, v)
         assert NIS >= 0, "EKSF.NIS_GNSS_positionNIS: NIS not positive"
         return NIS
 
@@ -732,6 +731,56 @@ class ESKF:
         NEES = diff @ la.solve(P, diff)
         assert NEES >= 0, f"ESKF._NEES: negative NEES: {round(NEES,3)}"
         return NEES
+
+    @classmethod
+    def alternative_NEESes(
+    cls, x_nominal: np.ndarray, P: np.ndarray, x_true: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Calculates some alternativ NEESes for the substates
+
+        Args:
+            x_nominal (np.ndarray): The nominal estimate
+            P (np.ndarray): The error state covariance
+            x_true (np.ndarray): The true state
+
+        Returns:
+            np.ndarray: NEES for [[position, velocity, attitude],[position, velocity],
+            [acceleration_bias, gyroscope_bias]], shape (3,)
+        """
+
+        assert x_nominal.shape == (
+            16,
+        ), f"ESKF.NEES: x_nominal shape incorrect {x_nominal.shape}"
+        assert P.shape == (15, 15), f"ESKF.NEES: P shape incorrect {P.shape}"
+        assert x_true.shape == (
+            16,
+        ), f"ESKF.NEES: x_true shape incorrect {x_true.shape}"
+
+        d_x = cls.delta_x(x_nominal, x_true)
+
+        POS_VEL_ERR_ATT_IDX     = CatSlice(0, stop = 9)
+        POS_VEL_IDX             = CatSlice(0, stop = 6)
+        ERR_ACC_GYRO_BIAS_IDX   = CatSlice(9, stop = 15)
+
+        NEES_pos_vel_att    = cls._NEES(P[POS_VEL_ERR_ATT_IDX**2], d_x[POS_VEL_ERR_ATT_IDX])
+        NEES_pos_vel        = cls._NEES(P[POS_VEL_IDX**2], d_x[POS_VEL_IDX])
+
+        P_pos_att       = la.block_diag(P[POS_IDX**2],P[ERR_ATT_IDX**2])
+        d_x_pos_att     = np.concatenate((d_x[POS_IDX], d_x[ERR_ATT_IDX]))
+        NEES_pos_att    = cls._NEES(P_pos_att,d_x_pos_att)
+
+        P_vel_att       = la.block_diag(P[VEL_IDX**2],P[ERR_ATT_IDX**2])
+        d_x_vel_att     = np.concatenate((d_x[VEL_IDX], d_x[ERR_ATT_IDX]))
+        NEES_vel_att    = cls._NEES(P_vel_att,d_x_vel_att)
+
+        NEES_accbias_gyrobias  = cls._NEES(P[ERR_ACC_GYRO_BIAS_IDX**2],  d_x[ERR_ACC_GYRO_BIAS_IDX])
+
+        NEESes = np.array(
+            [NEES_pos_vel_att, NEES_pos_vel, NEES_pos_att,NEES_vel_att, NEES_accbias_gyrobias]
+        )
+        assert np.all(NEESes >= 0), "ESKF.NEES: one or more negative NEESes"
+        return NEESes
 
 
 # %%

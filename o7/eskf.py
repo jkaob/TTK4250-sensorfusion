@@ -641,9 +641,17 @@ class ESKF:
         v, S, _ = self.innovation_GNSS_position(
             x_nominal, P, z_GNSS_position, R_GNSS, lever_arm )
 
-        NIS = v.T @ la.solve(S, v)
+        NIS          = v.T     @ la.solve(S, v)
+        
+        NIS_planar   = v[:2].T @ la.solve(S[:2,:2], v[:2])
+        
+        NIS_altitude = v[-1] * 1/S[-1, -1] * v[-1]
+        
         assert NIS >= 0, "EKSF.NIS_GNSS_positionNIS: NIS not positive"
-        return NIS
+        assert NIS_planar >= 0, "EKSF.NIS_GNSS_positionNIS: NIS_planar not positive"
+        assert NIS_altitude >= 0, "EKSF.NIS_GNSS_positionNIS: NIS_altitude not positive"
+        return NIS, NIS_planar, NIS_altitude
+    
 
     @classmethod
     def delta_x(cls,

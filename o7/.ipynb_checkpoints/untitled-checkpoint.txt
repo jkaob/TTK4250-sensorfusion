@@ -1,0 +1,68 @@
+PLOT LOG
+
+N        | 50k:90k                                                                        |0:300k
+         |      1     2       3     4     5    6     7       8        9   10    11      12|
+=====================================================================================================
+sigma_a  |5e-2    |      |       |     |     |    |1.17e-3|1.1e-2|      |     |5e-2  |8e-3|
+sigma_g  |4e-4    |      |       |     |     |    |4.36e-6|4.3e-4|      |     |4e-4  |    |
+sigma_a,b|4e-4    |      |       |     |     |4e-6|       |4e-3  |      |4e-2 |8e-5  |    |
+sigma_g,b|4e-5    |      |       |     | 4e-2|4e-6|       |4e-5  |      |4e-3 |1.4e-6|    |
+p        |1e-14   |      |       |     |     |    |1e-16  |      |      |     |      |    |
+R_GNSS*I |1²a     | 0.3²a|       |     |     |    |       |      |0.3²a²|0.3²a|      |    |
+P[0]|3²,3²,15²,4s,3s     |20s,20s|2s,2s|2s,4s|    |       |      |      |     |      |    |
+=====================================================================================================
+NIS tot  | 67.5   | 71.9 |             | 53.8|79.4|       |             |67.5 |79.4  |60.6|
+NIS plan | 87.5   | 84.4 |             | 58.8|88.8|       |             |72.5 |88.8  |68.8|
+NIS alt  | 95.6   | 96.9 |             | 95.0|91.9|       |             |83.1 |91.9  |65.6|
+---------|
+ANIS     | 1.31   | 2.99 | 6.01  |2.48 |1.67 |2.96|241.74 |10.4  |8.54  |9.31 |2.96  |13.6|
+ANIS_plan| 1.21   | 2.49 | 5.41  |1.99 |1.16 |2.41|225.36 |7.64  |6.37  |6.78 |2.41  |9.52|
+ANIS_alt | 0.11   | 0.49 | 0.73  |0.48 |0.47 |0.53|17.22  |3.19  |2.53  |2.85 |0.53  |4.68|
+=====================================================================================================
+
+Comments:
+50k:90k means that the biases have not converged yet
+should maybe increase initial cov ? 
+Should not really tune init when we skip timesteps
+
+ANIS intervals:
+---40k:90k | [2.63, 3.39] | [1.70, 2.32] | [0.79, 1.23]
+
+1: Too low NIS overall.
+2: Decreasing R_GNSS. ANIS_planar above. ANIS within.
+3: increasing init bias cov. ANIS too high ff
+4: decreasing init.. ANIS low again. Gyro bias z goes to -12000 at t= 25. 
+5: increasing sigma_g,b. does noe really affect gyro at all . worse NIS
+6: decreasing driving noise. ANIS-plan just above interval. Gives good NIS but does this make sense? maybe makes more sense to have more inaccuracy in R and also more in sigmas . but then the nis are too low...
+7: back to default sigmas. way to big anis. obviously need these low
+8: decreased sigma_a,g and was still too high. also decreased sig_b. still big
+9:
+10: doesnt look like bias driving  really matters?
+11:
+21:
+
+N        | 0:300k                                                       |Full
+         |     A1    |         A2     |  A3 |  A4     | A5  | A6 | A7   | B1 
+=====================================================================================================
+sigma_a  |8e-3       |                |     |         |     |4e-3|6e-3  | 
+sigma_g  |4e-4       |                | 1e-4|         |     
+sigma_a,b|8e-5       |                |     |         |
+sigma_g,b|1.4e-6     | 8e-6           |     |         |
+p        |1e-16      | 1e-8           |     |         |
+R_GNSS*I |0.3²a      |                | 0.1²|0.1²,0.3²|,0.2²|    |,0.15²|
+P   |3²,3²,15²,2s,4s |   ,  ,7²,  ,   |     | , , ,3s,|
+=====================================================================================================
+NIS tot  | 45.0      | prikk likt     | 71.2| 62.7    | 66.5|74.1| 72.2 | 74.1
+NIS plan | 43.4      |                | 71.9| 71.8    | 71.6|75.5| 72.9 | 74.6
+NIS alt  | 94.4      |                | 89.6| 94.5    | 93.9|93.8| 93.0 | 94.4
+---------|
+ANIS     | 0.64      | prikk likt     | 3.02| 2.01    | 2.26|4.06| 3.24 | 2.13
+ANIS_plan| 0.34      |                | 1.49| 1.69    | 1.69|3.18| 2.23 | 1.38
+ANIS_alt | 0.29      |                | 1.49| 0.32    | 0.55|0.84| 0.97 | 0.73
+=====================================================================================================
+
+3. Denne er fin, har lagret plot over NIS
+4. planar ble bedre 
+5. justerte bare vertikal R, blir bedre ja. 
+6. Den er veldig sensitiv på den støyen der
+7. Tok støyen i midten. Dette er vel den beste

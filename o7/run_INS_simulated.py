@@ -119,13 +119,13 @@ p_gyro = 1e-16
 
 # %% Estimator
 eskf = ESKF(
-    acc_std,
-    rate_std,
-    cont_acc_bias_driving_noise_std,
-    cont_rate_bias_driving_noise_std,
-    p_acc,
-    p_gyro,
-    S_a=S_a, # set the accelerometer correction matrix
+    acc_std,                              # -> sigma_acc       = w
+    rate_std,                             # -> sigma_gyro      = w
+    cont_acc_bias_driving_noise_std,      # -> sigma_acc_bias  = 
+    cont_rate_bias_driving_noise_std,     # -> sigma_gyro_bias = 
+    p_acc,                                # -> p_acc           = 
+    p_gyro,                               # -> p_gyro          = 
+    S_a=S_a, # set the accel correction matrix
     S_g=S_g, # set the gyro correction matrix,
     debug=False # : False to avoid expensive debug checks, can also be suppressed by calling 'python -O run_INS_simulated.py'
 )

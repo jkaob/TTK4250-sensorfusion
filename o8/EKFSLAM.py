@@ -285,17 +285,12 @@ class EKFSLAM:
     ):  # -> Tuple[*((np.ndarray,) * 5)]:
         """Associate landmarks and measurements, and extract correct matrices for these.
         Parameters
-         z : np.ndarray,
-            The measurements all in one vector
-         zpred : np.ndarray
-            Predicted measurements in one vector
-         H : np.ndarray
-            The measurement Jacobian matrix related to zpred
-         S : np.ndarray
-            The innovation covariance related to zpred
+         z : np.ndarray,            The measurements all in one vector
+         zpred : np.ndarray         Predicted measurements in one vector
+         H : np.ndarray             The measurement Jacobian matrix related to zpred
+         S : np.ndarray             The innovation covariance related to zpred
         Returns
-         Tuple[*((np.ndarray,) * 5)]
-            The extracted measurements, the corresponding zpred, H, S and the associations.
+         Tuple[*((np.ndarray,) * 5)]  The extracted measurements, the corresponding zpred, H, S and the associations.
         Note
          See the associations are calculated  using JCBB. See this function for documentation
          of the returned association and the association procedure.
@@ -325,26 +320,19 @@ class EKFSLAM:
 
             return zass, zpredass, Hass, Sass, a
         else:
-            # should one do something her
+            # should one do something here
             pass
 
     def update(
         self, eta: np.ndarray, P: np.ndarray, z: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, float, np.ndarray]:
         """Update eta and P with z, associating landmarks and adding new ones.
-
         Parameters
-        ----------
-        eta : np.ndarray
-            [description]
-        P : np.ndarray
-            [description]
-        z : np.ndarray, shape=(#detections, 2)
-            [description]
-
+         eta : np.ndarray
+         P : np.ndarray
+         z : np.ndarray, shape=(#detections, 2)
         Returns
-        -------
-        Tuple[np.ndarray, np.ndarray, float, np.ndarray]
+         Tuple[np.ndarray, np.ndarray, float, np.ndarray]
             [description]
         """
         numLmk = (eta.size - 3) // 2
@@ -352,15 +340,13 @@ class EKFSLAM:
 
         if numLmk > 0:
             # Prediction and innovation covariance
-            zpred = #TODO
-            H = # TODO
+            zpred   = self.h(eta)
+            H       = self.H(eta)
 
             # Here you can use simply np.kron (a bit slow) to form the big (very big in VP after a while) R,
             # or be smart with indexing and broadcasting (3d indexing into 2d mat) realizing you are adding the same R on all diagonals
-            S = # TODO,
-            assert (
-                S.shape == zpred.shape * 2
-            ), "EKFSLAM.update: wrong shape on either S or zpred"
+            S = np.kron(np.eye(2*numLmk), R)
+            assert ( S.shape == zpred.shape * 2), "EKFSLAM.update: wrong shape on either S or zpred"
             z = z.ravel()  # 2D -> flat
 
             # Perform data association
@@ -368,9 +354,9 @@ class EKFSLAM:
 
             # No association could be made, so skip update
             if za.shape[0] == 0:
-                etaupd = # TODO
-                Pupd = # TODO
-                NIS = 1 # TODO: beware this one when analysing consistency.
+                etaupd  = eta # TODO
+                Pupd    = P # TODO
+                NIS     = 1 # TODO: beware this one when analysing consistency.
 
             else:
                 # Create the associated innovation
@@ -378,17 +364,18 @@ class EKFSLAM:
                 v[1::2] = utils.wrapToPi(v[1::2])
 
                 # Kalman mean update
-                # S_cho_factors = la.cho_factor(Sa) # Optional, used in places for S^-1, see scipy.linalg.cho_factor and scipy.linalg.cho_solve
-                W = # TODO, Kalman gain, can use S_cho_factors
-                etaupd = # TODO, Kalman update
+                S_cho_factors = la.cho_factor(Sa) # Optional, used in places for S^-1, see scipy.linalg.cho_factor and scipy.linalg.cho_solve
+                W       = P @ Ha.T @ la.cho_solve(S_cho_factors, np.eye(Sa.shape[0])) #, Kalman gain, can use S_cho_factors
+                etaupd  = eta + W @ v # TODO, Kalman update
 
                 # Kalman cov update: use Joseph form for stability
                 jo = -W @ Ha
                 jo[np.diag_indices(jo.shape[0])] += 1  # same as adding Identity mat
-                Pupd = # TODO, Kalman update. This is the main workload on VP after speedups
+                # (I-WH)*P
+                Pupd = Jo @ P @ Jo.T + W @ self.R @ W.T # TODO, Kalman update. This is the main workload on VP after speedups
 
                 # calculate NIS, can use S_cho_factors
-                NIS = # TODO
+                NIS = 1# TODO
 
                 # When tested, remove for speed
                 assert np.allclose(Pupd, Pupd.T), "EKFSLAM.update: Pupd not symmetric"
@@ -399,9 +386,9 @@ class EKFSLAM:
         else:  # All measurements are new landmarks,
             a = np.full(z.shape[0], -1)
             z = z.flatten()
-            NIS = 0 # TODO: beware this one, you can change the value to for instance 1
-            etaupd = eta
-            Pupd = P
+            NIS     = 1 # TODO: beware this one, you can change the value to for instance 1
+            etaupd  = eta
+            Pupd    = P
 
         # Create new landmarks if any is available
         if self.do_asso:
@@ -411,7 +398,8 @@ class EKFSLAM:
                 z_new_inds[::2] = is_new_lmk
                 z_new_inds[1::2] = is_new_lmk
                 z_new = z[z_new_inds]
-                etaupd, Pupd = # TODO, add new landmarks.
+                # TODO, add new landmarks:
+                etaupd, Pupd = self.add_landmarks(etaupd, Pupd, za)
 
         assert np.allclose(Pupd, Pupd.T), "EKFSLAM.update: Pupd must be symmetric"
         assert np.all(np.linalg.eigvals(Pupd) >= 0), "EKFSLAM.update: Pupd must be PSD"

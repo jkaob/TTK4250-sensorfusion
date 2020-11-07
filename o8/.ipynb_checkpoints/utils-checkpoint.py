@@ -8,4 +8,4 @@ def rotmat2d(angle):
                      [np.sin(angle),  np.cos(angle)]])
 
 def polar2cartesian(range, angle):
-    return range*np.cos(angle), range*np.sin(angle) #- np.pi)
+    return range*np.cos(angle), range*np.sin(angle - np.pi)

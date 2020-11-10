@@ -291,7 +291,8 @@ class EKFSLAM:
             # Associate
             a = JCBB(z, zpred, S, self.alphas[0], self.alphas[1])
 
-            if self.prnt: print(f"=associated: \n  a = {a}")
+            #if self.prnt:
+            print(f"mk = {len(z)//2}   \t a = {a}")
 
             # Extract associated measurements
             zinds = np.empty_like(z, dtype=bool)
@@ -431,10 +432,10 @@ class EKFSLAM:
 
         d_p = d_x[0:2]
         P_p = P[0:2, 0:2]
-        # assert d_p.shape == (2,), "EKFSLAM.NEES: d_p must be 2 long"
         d_heading = d_x[2]  # Note: scalar
-        # assert np.ndim(d_heading) == 0, "EKFSLAM.NEES: d_heading must be scalar"
         P_heading = P[2, 2]  # Note: scalar
+        # assert d_p.shape == (2,), "EKFSLAM.NEES: d_p must be 2 long"
+        # assert np.ndim(d_heading) == 0, "EKFSLAM.NEES: d_heading must be scalar"
         # assert np.ndim(P_heading) == 0, "EKFSLAM.NEES: P_heading must be scalar"
 
         # NB: Needs to handle both vectors and scalars! Additionally, must handle division by zero

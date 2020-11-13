@@ -140,7 +140,7 @@ mk = mk_first
 t = timeOdo[0]
 
 # %%  run
-N = 1000#K
+N = 100#K
 
 doPlot = False
 
@@ -185,9 +185,7 @@ for k in tqdm(range(N)):
 
         if num_asso > 0:
             NISnorm[mk] = NIS[mk] / (2 * num_asso)
-            CInorm[mk] = np.array(chi2.interval(confidence_prob, 2 * num_asso)) / (
-                2 * num_asso
-            )
+            CInorm[mk] = np.array(chi2.interval(confidence_prob, 2 * num_asso)) / (2 * num_asso )
         else:
             NISnorm[mk] = 1
             CInorm[mk].fill(1)

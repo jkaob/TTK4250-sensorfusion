@@ -22,11 +22,10 @@ except ImportError as e:
 
 # %% plot config check and style setup
 
-
 # to see your plot config
-print(f"matplotlib backend: {matplotlib.get_backend()}")
+print(f"matplotlib backend:     {matplotlib.get_backend()}")
 print(f"matplotlib config file: {matplotlib.matplotlib_fname()}")
-print(f"matplotlib config dir: {matplotlib.get_configdir()}")
+print(f"matplotlib config dir:  {matplotlib.get_configdir()}")
 plt.close("all")
 
 # try to set separate window ploting
@@ -41,9 +40,6 @@ if "inline" in matplotlib.get_backend():
         IPython.get_ipython().run_line_magic("matplotlib", "")
     else:
         print("unknown inline backend")
-
-print("continuing with this plotting backend", end="\n\n\n")
-
 
 # set styles
 try:
@@ -89,83 +85,86 @@ simSLAM_ws = loadmat("simulatedSLAM")
 z = [zk.T for zk in simSLAM_ws["z"].ravel()]
 
 landmarks = simSLAM_ws["landmarks"].T
-odometry = simSLAM_ws["odometry"].T
-poseGT = simSLAM_ws["poseGT"].T
+odometry  = simSLAM_ws["odometry"].T
+poseGT    = simSLAM_ws["poseGT"].T
 
 K = len(z)
 M = len(landmarks)
 
-# %% Initilize
-Q = # TODO
-R = # TODO
+# %% Initialize
+###############################################################################
+#odometry
+Q = np.diag([0.08**2,            # x-velocity
+             0.08**2,            # y-velocity
+            (0.5*np.pi/180)**2])  # yaw rate
+#measurements
+R = np.diag([0.062**2,             #sigma_r
+            (0.9*np.pi/180)**2]) #sigma_theta
 
-doAsso = True
-
-JCBBalphas = np.array(
-    # TODO,
-)  # first is for joint compatibility, second is individual
-# these can have a large effect on runtime either through the number of landmarks created
-# or by the size of the association search space.
-
-slam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas)
+JCBBalphas = np.array([1e-6,    # joint compatibility
+                       1e-8])   # individual compatibility
 
 # allocate
-eta_pred: List[Optional[np.ndarray]] = [None] * K
-P_pred: List[Optional[np.ndarray]] = [None] * K
-eta_hat: List[Optional[np.ndarray]] = [None] * K
-P_hat: List[Optional[np.ndarray]] = [None] * K
-a: List[Optional[np.ndarray]] = [None] * K
-NIS = np.zeros(K)
-NISnorm = np.zeros(K)
-CI = np.zeros((K, 2))
-CInorm = np.zeros((K, 2))
-NEESes = np.zeros((K, 3))
+eta_pred : List[Optional[np.ndarray]] = [None] * K
+P_pred   : List[Optional[np.ndarray]] = [None] * K
+eta_hat  : List[Optional[np.ndarray]] = [None] * K
+P_hat    : List[Optional[np.ndarray]] = [None] * K
+a        : List[Optional[np.ndarray]] = [None] * K
+NIS      = np.zeros(K)
+NISnorm  = np.zeros(K)
+CI       = np.zeros((K, 2))
+CInorm   = np.zeros((K, 2))
+NEESes   = np.zeros((K, 3))
 
 # For consistency testing
-alpha = 0.05
+alpha    = 0.05
 
 # init
 eta_pred[0] = poseGT[0]  # we start at the correct position for reference
-P_pred[0] = np.zeros((3, 3))  # we also say that we are 100% sure about that
+P_pred[0]   = np.zeros((3, 3))  # we also say that we are 100% sure about that
 
-# %% Set up plotting
-# plotting
 
+# USER INPUTS
+playMovie  = False
+doAsso     = True
 doAssoPlot = False
-playMovie = True
+N          = K
+
+slam = EKFSLAM(Q, R, do_asso=doAsso, alphas=JCBBalphas, prnt=False)
+
 if doAssoPlot:
     figAsso, axAsso = plt.subplots(num=1, clear=True)
-
+total_asso = 0
 # %% Run simulation
-N = K
-
 print("starting sim (" + str(N) + " iterations)")
-
 for k, z_k in tqdm(enumerate(z[:N])):
+    if slam.prnt:
+        print(f"\n===ITERATION {k}, START===\n \n  z_{k}.shape = {z_k.shape}  <-LANDMARKS = {z_k.shape[0]}")
+        print(f"  eta_pred[{k}].shape = {eta_pred[k].shape}\n  P_pred[{k}].shape = {P_pred[k].shape}")
 
-    eta_hat[k], P_hat[k], NIS[k], a[k] = # TODO update
+    eta_hat[k], P_hat[k], NIS[k], a[k] = slam.update(eta_pred[k], P_pred[k], z_k)
 
     if k < K - 1:
-        eta_pred[k + 1], P_pred[k + 1] = # TODO predict
+        eta_pred[k + 1], P_pred[k + 1] = slam.predict(eta_hat[k], P_hat[k].copy(), odometry[k,:])
 
-    assert (
-        eta_hat[k].shape[0] == P_hat[k].shape[0]
+    assert (eta_hat[k].shape[0] == P_hat[k].shape[0]
     ), "dimensions of mean and covariance do not match"
 
-    num_asso = np.count_nonzero(a[k] > -1)
-
-    CI[k] = chi2.interval(alpha, 2 * num_asso)
+    num_asso    = np.count_nonzero(a[k] > -1)
+    CI[k]       = chi2.interval(1-alpha, 2 * num_asso)
+    total_asso += num_asso
 
     if num_asso > 0:
         NISnorm[k] = NIS[k] / (2 * num_asso)
-        CInorm[k] = CI[k] / (2 * num_asso)
+        CInorm[k]  = CI[k]  / (2 * num_asso)
     else:
         NISnorm[k] = 1
         CInorm[k].fill(1)
 
-    NEESes[k] = # TODO, use provided function slam.NEESes
+    if k > 0:
+        NEESes[k] = slam.NEESes(eta_hat[k][:3], P_hat[k][:3,:3], poseGT[k])
 
-    if doAssoPlot and k > 0:
+    if doAsso and doAssoPlot and k > 0:
         axAsso.clear()
         axAsso.grid()
         zpred = slam.h(eta_pred[k]).reshape(-1, 2)
@@ -179,12 +178,13 @@ for k, z_k in tqdm(enumerate(z[:N])):
         axAsso.set_title(f"k = {k}, {np.count_nonzero(a[k] > -1)} associations")
         plt.draw()
         plt.pause(0.001)
-
-
-print("sim complete")
+#NIS[0] = None
+#print(NIS[0])
+print("sim complete | total associations :", total_asso)
+print("len NIS: ", len(NIS))
 
 pose_est = np.array([x[:3] for x in eta_hat[:N]])
-lmk_est = [eta_hat_k[3:].reshape(-1, 2) for eta_hat_k in eta_hat]
+lmk_est  = [eta_hat_k[3:].reshape(-1, 2) for eta_hat_k in eta_hat[:N]]
 lmk_est_final = lmk_est[N - 1]
 
 np.set_printoptions(precision=4, linewidth=100)
@@ -210,42 +210,53 @@ for l, lmk_l in enumerate(lmk_est_final):
     el = ellipse(lmk_l, rI, 5, 200)
     ax2.plot(*el.T, "b")
 
-ax2.plot(*poseGT.T[:2], c="r", label="gt")
+ax2.plot(*poseGT.T[:2,:N], c="r", label="gt")
 ax2.plot(*pose_est.T[:2], c="g", label="est")
 ax2.plot(*ellipse(pose_est[-1, :2], P_hat[N - 1][:2, :2], 5, 200).T, c="g")
-ax2.set(title="results", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
+ax2.set(xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1])) #title="Trajectory and landmark associations",
 ax2.axis("equal")
 ax2.grid()
+ax2.scatter(*pose_est.T[:2, 250],  lw=3, label='k=250')
+ax2.scatter(*pose_est.T[:2, 400],  lw=3, label='k=400')
+ax2.scatter(*pose_est.T[:2, 550],  lw=3, label='k=550')
+ax2.scatter(*pose_est.T[:2, 650],  lw=3, label='k=650')
+ax2.scatter(*pose_est.T[:2, 800],  lw=3, label='k=800')
+ax2.legend()
+#plot k 250, 400, 550, 650
 
 # %% Consistency
 
 # NIS
 insideCI = (CInorm[:N,0] <= NISnorm[:N]) * (NISnorm[:N] <= CInorm[:N,1])
+NIS_arr  = NIS[~np.isnan(NIS)]  #removing NaNs
+CI_ANIS  = np.array(chi2.interval(1-alpha, 2*total_asso)) / len(NIS_arr)
 
 fig3, ax3 = plt.subplots(num=3, clear=True)
-ax3.plot(CInorm[:N,0], '--')
-ax3.plot(CInorm[:N,1], '--')
+ax3.plot(CInorm[:N,0], '--', lw=2)
+ax3.plot(CInorm[:N,1], '--', lw=2)
 ax3.plot(NISnorm[:N], lw=0.5)
-
-ax3.set_title(f'NIS, {insideCI.mean()*100}% inside CI')
+ax3.set_title(f'NIS: {insideCI.mean()*100:.2f}% inside CI\nANIS = {NIS_arr.mean():.2f} with CI: [{CI_ANIS[0]:.2f}, {CI_ANIS[1]:.2f}]')
+fig3.tight_layout()
+print("nis arr", len(NIS_arr))
+print(f"CI ANIS:      {CI_ANIS}\t ANIS= {NIS_arr.mean():.3f}")
 
 # NEES
 
-fig4, ax4 = plt.subplots(nrows=3, ncols=1, figsize=(7, 5), num=4, clear=True, sharex=True)
-tags = ['all', 'pos', 'heading']
+fig4, ax4 = plt.subplots(nrows=3, ncols=1, num=4, clear=True, sharex=True, figsize=(4,4))
+tags = ['all', 'pos', 'yaw']
 dfs = [3, 2, 1]
 
 for ax, tag, NEES, df in zip(ax4, tags, NEESes.T, dfs):
-    CI_NEES = chi2.interval(alpha, df)
-    ax.plot(np.full(N, CI_NEES[0]), '--')
-    ax.plot(np.full(N, CI_NEES[1]), '--')
+    CI_NEES = chi2.interval(1 - alpha, df)
+    ax.plot(np.full(N, CI_NEES[0]), '--',lw=2)
+    ax.plot(np.full(N, CI_NEES[1]), '--',lw=2)
     ax.plot(NEES[:N], lw=0.5)
     insideCI = (CI_NEES[0] <= NEES) * (NEES <= CI_NEES[1])
-    ax.set_title(f'NEES {tag}: {insideCI.mean()*100}% inside CI')
 
-    CI_ANEES = np.array(chi2.interval(alpha, df*N)) / N
-    print(f"CI ANEES {tag}: {CI_ANEES}")
-    print(f"ANEES {tag}: {NEES.mean()}")
+    CI_ANEES = np.array(chi2.interval(1 - alpha, df*N)) / N
+    print(f"CI ANEES {tag}: {CI_ANEES}\t ANEES= {NEES.mean():.3f}")
+
+    ax.set_title(f'NEES {tag}: {insideCI.mean()*100:.2f}% inside CI\nANEES = {NEES.mean():.2f} with CI: [{CI_ANEES[0]:.2f}, {CI_ANEES[1]:.2f}]')
 
 fig4.tight_layout()
 
@@ -254,7 +265,7 @@ fig4.tight_layout()
 ylabels = ['m', 'deg']
 scalings = np.array([1, 180/np.pi])
 
-fig5, ax5 = plt.subplots(nrows=2, ncols=1, figsize=(7, 5), num=5, clear=True, sharex=True)
+fig5, ax5 = plt.subplots(nrows=2, ncols=1, num=5, clear=True, sharex=True)
 
 pos_err = np.linalg.norm(pose_est[:N,:2] - poseGT[:N,:2], axis=1)
 heading_err = np.abs(utils.wrapToPi(pose_est[:N,2] - poseGT[:N,2]))
@@ -263,9 +274,11 @@ errs = np.vstack((pos_err, heading_err))
 
 for ax, err, tag, ylabel, scaling in zip(ax5, errs, tags[1:], ylabels, scalings):
     ax.plot(err*scaling)
-    ax.set_title(f"{tag}: RMSE {np.sqrt((err**2).mean())*scaling} {ylabel}")
+    rmse = np.sqrt((err**2).mean())*scaling
+    ax.set_title(f"{tag}: RMSE {rmse:.2f} {ylabel}")
     ax.set_ylabel(f"[{ylabel}]")
     ax.grid()
+    ax.plot(np.full(N, rmse), '--',lw=1.5,color='midnightblue')
 
 fig5.tight_layout()
 

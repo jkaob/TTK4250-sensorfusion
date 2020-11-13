@@ -1,63 +1,176 @@
-JCBBalphas = np.array([0.01,
-                       0.01])
-mk = 9 	   a = [-1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 10 	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 10 	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 11 	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 11 	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 24]
-mk = 12 	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 13 	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 13 	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 13 	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 48]
-mk = 13 	 a = [-1 76 -1 54 93 -1 -1 -1 68 -1 -1 -1 -1]
-mk = 13 	 a = [ -1  79 107  94  88  77  -1  -1  70  -1  -1  62  74]
-mk = 14 	 a = [ -1  86  87 112  82  -1  -1  -1  -1  -1  -1 106  -1  93]
-mk = 14 	 a = [ -1  99 115  65 113 116 119  -1 103  -1  -1 122 114  -1]
-mk = 14 	 a = [ -1  -1 129  -1  -1 121  -1  -1  88  -1  68 128  -1  76]
-mk = 13 	 a = [108 124  -1  89 135  -1  -1  -1  -1  -1 134  -1  -1]
-mk = 13 	 a = [ -1 125 140 117  -1  -1  -1  -1  -1  -1 142  -1  -1]
-mk = 13 	 a = [ 96 150 149 132 151  -1  -1  83  -1  -1  81  -1 138]
-mk = 14 	 a = [ -1 133 145  -1 155 160 158  -1 143  -1  -1 154 148  -1]
-mk = 13 	 a = [164  -1  -1 157  -1  -1  -1 113  88  -1  -1  -1  -1]
-mk = 13 	 a = [153  -1  -1 165  -1  -1  -1 171  -1  -1  -1 163  90]
-mk = 13 	 a = [161 167  -1 178  -1  -1  -1 169  -1  -1  -1  -1  -1]
-mk = 13 	 a = [170 174  -1 179  -1  -1  -1 134  -1  -1  -1  -1  -1]
-mk = 13 	 a = [175 113  -1 186  -1  -1  -1 187  -1 103  -1  -1 107]
-mk = 13 	 a = [ -1 193  -1 181 194  -1  -1 182  -1 171  -1  -1  -1]
-
-JCBBalphas = np.array([0.1,
-                       0.1])
-mk = 9   	   a = [-1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 10   	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 10   	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 11   	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 11   	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 24]
-mk = 12   	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 13   	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 13   	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 13   	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 13   	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 13   	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 14   	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 14   	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 14   	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 13   	 a = [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1]
-mk = 13   	 a = [-1 -1 -1 -1 -1 -1 -1 -1 95 -1 -1 -1 -1]
-mk = 13   	 a = [ -1  -1  -1  -1  -1  -1  -1  -1 101  -1  -1  -1  -1]
-mk = 14   	 a = [160  -1  -1  -1  -1  -1  -1 186  -1  -1  -1  -1  -1  -1]
-mk = 13   	 a = [179 146  -1 152  -1  -1 128  -1  -1  -1  -1 159  -1]
-mk = 13   	 a = [196  -1  -1 182  -1  -1 211  -1  -1  -1  -1  -1  -1]
-mk = 13   	 a = [233  -1  -1 195  -1  -1 226  -1  -1  -1  -1  -1  -1]
-mk = 13   	 a = [241  -1  -1 183  -1  -1 232  -1  -1 160  -1  -1  -1]
-mk = 13   	 a = [149 229  -1 213  -1  -1 250  -1  -1  -1  -1 234  -1]
-mk = 13   	 a = [227 244  -1 214  -1  -1 254  -1  -1  -1  -1  -1  -1]
-
+#initial:
+###############################################################################
 #odometry
-Q = np.diag([0.8**2,
-             0.8**2,
-            (4*np.pi/180)**2])
+Q = np.diag([0.02**2,            # x-velocity
+             0.02**2,            # y-velocity
+            (1*np.pi/180)**2])  # yaw rate
 #measurements
-R = np.diag([2**2,              #sigma_r
-            (5*np.pi/180)**2])  #sigma_theta
-JCBBalphas = np.array([1e-5,
-                       1e-5])
+R = np.diag([0.04**2,             #sigma_r
+            (2.0*np.pi/180)**2]) #sigma_theta
+
+JCBBalphas = np.array([1e-6,    # joint compatibility
+                       1e-8])   # individual compatibility
+NEES: 2.2, 2.1, 70.3
+NIS:  84.4
+RMSE: pos 1.32, 1.16
+
+CI ANIS:      [19.0725 19.8462]	 ANIS= 21.937
+CI ANEES all: [2.8501 3.1537]	 ANEES= 81.453
+CI ANEES pos: [1.8779 2.1258]	 ANEES= 80.878
+CI ANEES yaw: [0.9143 1.0895]	 ANEES= 3.912
+
+
+tuning:
+###############################################################################
+#odometry
+Q = np.diag([0.035**2,            # x-velocity      #0.023
+             0.035**2,            # y-velocity      #0.023
+            (1.0*np.pi/180)**2])  # yaw rate      #1 grad yaw rate er ganske bra!
+#measurements
+R = np.diag([0.09**2,             #sigma_r
+            (2.0*np.pi/180)**2]) #sigma_theta
+
+JCBBalphas = np.array([1e-6,    # joint compatibility
+                       1e-8])   # individual compatibility
+
+NEES: 99.3 total within -
+NIS:  24.5 within
+RMSE: pos 0.60 | psi: 0.62
+CI ANEES all: [2.8501 3.1537]     - ANEES all: 4.04
+CI ANEES pos: [1.8779 2.1258]     - ANEES pos: 3.62
+CI ANEES heading: [0.9143 1.0895] - ANEES heading: 0.91
+
+##############################################################################
+#odometry
+Q = np.diag([0.039**2,            # x-velocity      #0.023
+             0.039**2,            # y-velocity      #0.023
+            (0.8*np.pi/180)**2])  # yaw rate      #1 grad yaw rate er ganske bra!
+#measurements
+R = np.diag([0.09**2,             #sigma_r
+            (2.0*np.pi/180)**2]) #sigma_theta
+
+NEES: 99.5 total
+NIS: 24.8
+RMSE: 0.44, 0.55
+CI ANEES all: [2.8501 3.1537]	 ANEES= 2.753
+CI ANEES pos: [1.8779 2.1258]	 ANEES= 2.186
+CI ANEES yaw: [0.9143 1.0895]	 ANEES= 0.772
+#  bedre men NIS er fortsatt dårlig
+
+##############################################################################
+#odometry
+Q = np.diag([0.041**2,            # x-velocity      #0.023
+             0.041**2,            # y-velocity      #0.023
+            (0.8*np.pi/180)**2])  # yaw rate      #1 grad yaw rate er ganske bra!
+#measurements
+R = np.diag([0.09**2,             #sigma_r
+            (2.0*np.pi/180)**2]) #sigma_theta
+
+JCBBalphas = np.array([1e-6,    # joint compatibility
+                       1e-8])   # individual compatibility
+NEES: 99.5 total
+NIS: 24.8
+RMSE: 0.44, 0.55
+
+CI ANEES all: [2.8501 3.1537]	 ANEES= 2.647
+CI ANEES pos: [1.8779 2.1258]	 ANEES= 2.082
+CI ANEES yaw: [0.9143 1.0895]	 ANEES= 0.758
+
+# yaw er litt lav - kan prøve å senke sigma_yaw litt mer.
+# men prøver heller å tune R litt for å få bedre NIS !
+
+###############################################################################
+#odometry
+Q = np.diag([0.041**2,            # x-velocity      #0.023
+             0.041**2,            # y-velocity      #0.023
+            (0.8*np.pi/180)**2])  # yaw rate      #1 grad yaw rate er ganske bra!
+#measurements
+R = np.diag([0.09**2,             #sigma_r
+            (1.0*np.pi/180)**2]) #sigma_theta
+
+NEES: 98.7
+NIS: 82.7
+RMSE: .35, .43
+
+CI ANEES all: [2.8501 3.1537]	 ANEES= 3.153
+CI ANEES pos: [1.8779 2.1258]	 ANEES= 2.134
+CI ANEES yaw: [0.9143 1.0895]	 ANEES= 1.191
+
+# halvere sigma_theta gir høyere ANEES, som jo ikke er dumt. Men gir mye bedre NIS!
+# kan levere med dette.
+
+###############################################################################
+#odometry
+Q = np.diag([0.041**2,            # x-velocity      #0.023
+             0.041**2,            # y-velocity      #0.023
+            (0.85*np.pi/180)**2])  # yaw rate
+#measurements
+R = np.diag([0.07**2,             #sigma_r
+            (1.0*np.pi/180)**2]) #sigma_theta
+
+NEES: 97.3 total
+NIS: 90.9
+RMSE: 0.41, 0.47
+CI ANEES all: [2.8501 3.1537]	 ANEES= 4.541
+CI ANEES pos: [1.8779 2.1258]	 ANEES= 3.510
+CI ANEES yaw: [0.9143 1.0895]	 ANEES= 1.551
+
+#senket sigma_r litt - økte yaw litt
+#gir bra NIS men ikke så bra ANEES. Kan øke usikkerheten litt der
+
+###############################################################################
+#odometry
+Q = np.diag([0.049**2,            # x-velocity      #0.023
+             0.049**2,            # y-velocity      #0.023
+            (0.75*np.pi/180)**2])  # yaw rate      #
+#measurements
+R = np.diag([0.07**2,             #sigma_r
+            (1.0*np.pi/180)**2]) #sigma_theta
+NEES: 97.9 total
+NIS: 90.2
+RMSE: 0.36, 0.45
+CI ANEES all: [2.8501 3.1537]	 ANEES= 3.893
+CI ANEES pos: [1.8779 2.1258]	 ANEES= 2.820
+CI ANEES yaw: [0.9143 1.0895]	 ANEES= 1.416
+
+
+# R-matrisen er sykt sensitiv og endrer alt egentlig, så må liksom tune den først
+# ser ut som å øke sigma-yaw gjør at anees går opp, mens ikke x og y-vel . rart
+#men denne er  veldig fin da .
+
+###############################################################################
+#odometry
+Q = np.diag([0.07**2,            # x-velocity      #0.023
+             0.07**2,            # y-velocity      #0.023
+            (0.7*np.pi/180)**2])  # yaw rate      #
+#measurements
+R = np.diag([0.07**2,             #sigma_r
+            (1.0*np.pi/180)**2]) #sigma_theta
+JCBBalphas = np.array([1e-6,    # joint compatibility
+                       1e-8])   # individual compatibility
+NEES: 98.3 , 99.8, 93.2
+NIS: 89.3
+RMSE: 0.33, 0.43
+CI ANIS:      [19.0725 19.8462]	 ANIS= 15.266
+CI ANEES all: [2.8501 3.1537]	 ANEES= 3.382
+CI ANEES pos: [1.8779 2.1258]	 ANEES= 2.276
+CI ANEES yaw: [0.9143 1.0895]	 ANEES= 1.315
+
+###############################################################################
+#odometry
+Q = np.diag([0.08**2,            # x-velocity
+             0.08**2,            # y-velocity
+            (0.5*np.pi/180)**2])  # yaw rate
+#measurements
+R = np.diag([0.062**2,             #sigma_r
+            (0.9*np.pi/180)**2]) #sigma_theta
+
+JCBBalphas = np.array([1e-6,    # joint compatibility
+                       1e-8])   # individual compatibility
+NEES: 96.5 , 99.3, 91.7
+NIS: 91.6
+RMSE: 0.24, 0.40
+CI ANIS:      [19.0725 19.8462]	 ANIS= 19.435
+CI ANEES all: [2.8501 3.1537]	 ANEES= 3.473
+CI ANEES pos: [1.8779 2.1258]	 ANEES= 1.843
+CI ANEES yaw: [0.9143 1.0895]	 ANEES= 1.530
